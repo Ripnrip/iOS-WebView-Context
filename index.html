@@ -43,6 +43,10 @@
   <div class="container">
     <h1>🔍 iOS Browser Detection</h1>
     <div class="info">
+      <label style="display:block; margin-bottom:10px;">
+        <input type="checkbox" id="ua-toggle" checked>
+        Enable User-Agent heuristics
+      </label>
       <strong>📱 How to test:</strong><br>
       • Open in Safari app<br>
       • Share URL to open in SFSafariViewController<br>
@@ -79,7 +83,8 @@
 
   <script>
     class IOSBrowserDetector {
-      constructor() {
+      constructor(useUA = true) {
+        this.useUA = useUA;
         this.results = {};
         this.confidence = 0;
         this.finalEnvironment = 'unknown';
@@ -139,8 +144,19 @@
         return ctx.measureText(s).width !== base;
       }
       testFontDetection() {
-        const fonts=['.Helvetica LT MM','SF Pro Text','SF Pro Display'];
-        return Object.fromEntries(fonts.map(f=>[f,this.doesFontExist(f)]));
+        const fonts = [
+          '.Helvetica LT MM',
+          'SF Pro Text',
+          'SF Pro Display',
+          'Arial',
+          'Times New Roman',
+          'Courier',
+          'Courier New',
+          'Georgia',
+          'Verdana',
+          'Trebuchet MS'
+        ];
+        return Object.fromEntries(fonts.map(f => [f, this.doesFontExist(f)]));
       }
 
       analyzeUserAgent() {
@@ -167,6 +183,50 @@
           platform:navigator.platform
         };
       }
+      
+      async testVisibilityChangeSignal() {
+        return new Promise(resolve => {
+          let sawHidden = false;
+          const onChange = () => {
+            if (document.visibilityState === 'hidden') {
+              sawHidden = true;
+            }
+            if (sawHidden && document.visibilityState === 'visible') {
+              document.removeEventListener('visibilitychange', onChange);
+              resolve(true);
+            }
+          };
+          document.addEventListener('visibilitychange', onChange);
+
+          // Trigger a dummy form.submit() into the hidden iframe to provoke a hide/show cycle
+          const form = document.createElement('form');
+          form.style.display = 'none';
+          form.method = 'POST';
+          form.action = '#';
+          form.target = 'detect-iframe';
+          document.body.appendChild(form);
+          form.submit();
+
+          // Timeout fallback
+          setTimeout(() => {
+            document.removeEventListener('visibilitychange', onChange);
+            resolve(false);
+          }, 500);
+        });
+      }
+
+      testWindowOpenSignal() {
+        try {
+          const w = window.open('', '_blank', 'width=100,height=100');
+          if (w) {
+            w.close();
+            return false;  // popup opened OK
+          }
+          return true;     // blocked or returned null
+        } catch {
+          return true;     // thrown => blocked
+        }
+      }
 
       async runDetection() {
         this.results.webkit = {hasWK:this.isWKWebView()};
@@ -174,7 +234,13 @@
         this.results.fonts  = this.testFontDetection();
         this.results.ua     = this.analyzeUserAgent();
         this.results.features = this.testFeatures();
+        this.results.visibilitySignal = await this.testVisibilityChangeSignal();
+        this.results.windowOpenBlocked = this.testWindowOpenSignal();
         this.finalEnvironment = this.determineEnvironment();
+        // Additional signals for SFSafariViewController
+        if (this.results.visibilitySignal || this.results.windowOpenBlocked) {
+          this.finalEnvironment = 'SFSafariViewController (via visibility/windowOpen signal)';
+        }
         // SFSafariViewController block
         if (this.finalEnvironment.includes('SFSafariViewController')) {
           const warning = document.createElement('div');
@@ -195,13 +261,25 @@
       determineEnvironment() {
         const {webkit, form, fonts, ua} = this.results;
         if (webkit.hasWK) return 'WKWebView (confirmed)';
-        if (form.blocked && fonts['.Helvetica LT MM']) return 'SFSafariViewController (detected via form+font)';
-        if (ua.isSafariAppUA) return 'Safari App (confirmed via UA)';
-        if (ua.hasChrome) return 'Chrome iOS';
-        if (ua.hasFirefox) return 'Firefox iOS';
-        if (ua.hasEdge) return 'Edge iOS';
-        if (ua.standalone) return 'PWA (Home Screen)';
-        if (ua.isSafari && ua.hasVersion) return form.blocked ? 'SFSafariViewController (possible)' : 'Safari App (likely)';
+        
+        // NEW: if either visibility-change or window.open blocking fires, treat as SFVC
+        if (this.results.visibilitySignal || this.results.windowOpenBlocked) {
+          return 'SFSafariViewController (via visibility/windowOpen signal)';
+        }
+
+        if (form.blocked && fonts['.Helvetica LT MM']) {
+          return 'SFSafariViewController (detected via form+font)';
+        }
+        
+        
+        if (this.useUA) {
+          if (ua.isSafariAppUA) return 'Safari App (confirmed via UA)';
+          if (ua.hasChrome) return 'Chrome iOS';
+          if (ua.hasFirefox) return 'Firefox iOS';
+          if (ua.hasEdge) return 'Edge iOS';
+          if (ua.standalone) return 'PWA (Home Screen)';
+          if (ua.isSafari && ua.hasVersion) return form.blocked ? 'SFSafariViewController (possible)' : 'Safari App (likely)';
+        }
         return 'Generic WebView';
       }
 
@@ -266,7 +344,8 @@
     }
 
     async function runDetection() {
-      const det=new IOSBrowserDetector();
+      const useUA = document.getElementById('ua-toggle').checked;
+      const det = new IOSBrowserDetector(useUA);
       await det.runDetection();
       det.updateUI();
     }
