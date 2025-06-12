@@ -204,6 +204,7 @@
       
       async testVisibilityChangeSignal() {
         return new Promise(resolve => {
+        const startTime = performance.now();
           let sawHidden = false;
           const onChange = () => {
             if (document.visibilityState === 'hidden') {
@@ -211,7 +212,9 @@
             }
             if (sawHidden && document.visibilityState === 'visible') {
               document.removeEventListener('visibilitychange', onChange);
-              resolve(true);
+              const now = performance.now();
+              if (now - startTime > 100) resolve(true);
+              else resolve(false); // early signal — likely not SFSafariVC
             }
           };
           document.addEventListener('visibilitychange', onChange);
@@ -400,7 +403,9 @@
       det.updateUI();
     }
 
-    document.addEventListener('DOMContentLoaded',runDetection);
+      document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(runDetection, 250); // delay avoids Safari false positives
+      });
   </script>
 </body>
 </html>
