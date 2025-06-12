@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>iOS Browser Environment Detection</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin: 20px 0;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .result {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 15px 0;
+            font-size: 1.1rem;
+            border-left: 5px solid #4CAF50;
+        }
+        .details {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9rem;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+        button {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        .warning {
+            background: rgba(255, 193, 7, 0.2);
+            border-left: 5px solid #FFC107;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+        .info {
+            background: rgba(33, 150, 243, 0.2);
+            border-left: 5px solid #2196F3;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 iOS Browser Detection</h1>
+
+        <div class="info">
+            <strong>📱 How to test:</strong><br>
+            • Open in Safari app<br>
+            • Share URL to open in SFSafariViewController<br>
+            • Test in custom app with WKWebView<br>
+            • Compare results across environments
+        </div>
+
+        <div class="result" id="main-result">
+            <strong>🎯 Detected Environment:</strong>
+            <span id="detection-result">Running detection...</span>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 Individual Test Results</h3>
+            <div class="details" id="webkit-test">WebKit MessageHandlers: Testing...</div>
+            <div class="details" id="form-test">Invisible Form Test: Testing...</div>
+            <div class="details" id="font-test">Font Detection Test: Testing...</div>
+            <div class="details" id="ua-test">User Agent Analysis: Testing...</div>
+            <div class="details" id="feature-test">Feature Detection: Testing...</div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Detection Confidence</h3>
+            <div class="details" id="confidence-score">Calculating...</div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Manual Tests</h3>
+            <button onclick="testWindowOpen()">Test window.open()</button>
+            <button onclick="testFullscreen()">Test Fullscreen API</button>
+            <button onclick="rerunDetection()">🔄 Re-run Detection</button>
+            <div class="details" id="manual-test-results"></div>
+        </div>
+
+        <div class="warning">
+            <strong>⚠️ Note:</strong> These detection methods are experimental and may not work reliably across all iOS versions.
+        </div>
+    </div>
+
+    <script>
+        class IOSBrowserDetector {
+            constructor() {
+                this.results = {};
+                this.confidence = 0;
+                this.finalEnvironment = 'unknown';
+            }
+
+            isWKWebView() {
+                return !!(window.webkit && window.webkit.messageHandlers);
+            }
+
+            hasDoNotTrack() {
+                return typeof navigator.doNotTrack !== 'undefined' ||
+                       typeof window.doNotTrack   !== 'undefined' ||
+                       typeof navigator.msDoNotTrack !== 'undefined';
+            }
+
+            hasServiceWorkers() {
+                return 'serviceWorker' in navigator;
+            }
+
+            async testInvisibleFormSubmission() {
+                return new Promise(resolve => {
+                    const form = document.createElement('form');
+                    form.style.display = 'none';
+                    form.method = 'POST';
+                    form.action = '#';
+                    const input = document.createElement('input');
+                    input.type = 'hidden'; input.name = 'test'; input.value = 'detection';
+                    form.appendChild(input);
+                    document.body.appendChild(form);
+
+                    let blocked = false, timed = false;
+                    const onSubmit = (e) => {
+                        e.preventDefault();
+                        cleanup();
+                        resolve({ blocked: false, method: 'submit-event' });
+                    };
+                    form.addEventListener('submit', onSubmit);
+
+                    const timer = setTimeout(() => {
+                        blocked = true;
+                        timed = true;
+                        cleanup();
+                        resolve({ blocked: true, method: 'timeout' });
+                    }, 100);
+
+                    try {
+                        form.submit();
+                    } catch (e) {
+                        clearTimeout(timer);
+                        cleanup();
+                        resolve({ blocked: true, method: 'exception', error: e.message });
+                    }
+
+                    function cleanup() {
+                        clearTimeout(timer);
+                        form.removeEventListener('submit', onSubmit);
+                        if (form.parentNode) document.body.removeChild(form);
+                    }
+                });
+            }
+
+            doesFontExist(fontName) {
+                const testString = 'abcdefghijklmnopqrstuvwxyz0123456789';
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                ctx.font = '72px monospace';
+                const base = ctx.measureText(testString).width;
+                ctx.font = `72px '${fontName}', monospace`;
+                const w = ctx.measureText(testString).width;
+                return w !== base;
+            }
+
+            testFontDetection() {
+                const fonts = ['.Helvetica LT MM','SF Pro Text','SF Pro Display'];
+                const results = {};
+                fonts.forEach(f => results[f] = this.doesFontExist(f));
+                return results;
+            }
+
+            analyzeUserAgent() {
+                const ua = navigator.userAgent;
+                return {
+                    full: ua,
+                    isiOS: /iPad|iPhone|iPod/.test(ua),
+                    isSafari: /Safari/.test(ua),
+                    hasVersion: /Version\//.test(ua),
+                    hasChrome: /CriOS/.test(ua),
+                    hasFirefox: /FxiOS/.test(ua),
+                    hasEdge: /EdgiOS/.test(ua),
+                    standalone: navigator.standalone === true
+                };
+            }
+
+            testFeatures() {
+                return {
+                    indexedDB: !!window.indexedDB,
+                    serviceWorker: this.hasServiceWorkers(),
+                    webGL: (() => {
+                        try {
+                            const c = document.createElement('canvas');
+                            return !!(c.getContext('webgl')||c.getContext('experimental-webgl'));
+                        } catch{ return false; }
+                    })(),
+                    fullscreen: document.fullscreenEnabled,
+                    doNotTrack: this.hasDoNotTrack(),
+                    maxTouchPoints: navigator.maxTouchPoints || 0,
+                    platform: navigator.platform
+                };
+            }
+
+            async runDetection() {
+                this.results.webkit = { hasWK: this.isWKWebView() };
+                this.results.form   = await this.testInvisibleFormSubmission();
+                this.results.fonts  = this.testFontDetection();
+                this.results.ua     = this.analyzeUserAgent();
+                this.results.features = this.testFeatures();
+
+                this.finalEnvironment = this.determineEnvironment();
+                this.confidence = this.calculateConfidence();
+                return { environment: this.finalEnvironment, confidence: this.confidence, details: this.results };
+            }
+
+            determineEnvironment() {
+                const { webkit, form, fonts, ua, features } = this.results;
+                if (webkit.hasWK) return 'WKWebView (confirmed)';
+                if (ua.hasChrome) return 'Chrome iOS';
+                if (ua.hasFirefox) return 'Firefox iOS';
+                if (ua.hasEdge) return 'Edge iOS';
+                if (ua.standalone) return 'PWA (Home Screen)';
+
+                if (ua.isSafari && ua.hasVersion) {
+                    const blocked = form.blocked;
+                    const fontDetected = fonts['.Helvetica LT MM'];
+                    if (blocked && fontDetected) return 'SFSafariViewController (high confidence)';
+                    if (blocked) return 'SFSafariViewController (medium)';
+                    if (!blocked && !fontDetected) return 'Safari App (likely)';
+                    return 'Safari/SFSafariViewController (inconclusive)';
+                }
+
+                if (ua.isiOS && !ua.isSafari) return 'Generic WebView';
+                return 'Unknown iOS Browser';
+            }
+
+            calculateConfidence() {
+                const { webkit, form, fonts, ua } = this.results;
+                let s = 0;
+                if (webkit.hasWK) s += 0.4;
+                if (ua.hasChrome||ua.hasFirefox||ua.hasEdge) s += 0.4;
+                if (ua.standalone) s += 0.4;
+                if (form.blocked) s += 0.2;
+                if (fonts['.Helvetica LT MM']) s += 0.2;
+                if (ua.isSafari && ua.hasVersion) s += 0.1;
+                return Math.min(s,1);
+            }
+
+            updateUI() {
+                const { webkit, form, fonts, ua, features } = this.results;
+                document.getElementById('detection-result').textContent = this.finalEnvironment;
+
+                document.getElementById('webkit-test').innerHTML =
+                    `<strong>WKWebView:</strong> ${webkit.hasWK ? '✅' : '❌'}`;
+
+                document.getElementById('form-test').innerHTML =
+                    `<strong>Form blocked:</strong> ${form.blocked ? '✅' : '❌'} (${form.method})`;
+
+                document.getElementById('font-test').innerHTML =
+                    Object.entries(fonts).map(([f,d]) => `${f}: ${d?'✅':'❌'}`).join(' | ');
+
+                document.getElementById('ua-test').innerHTML =
+                    `Safari: ${ua.isSafari?'✅':'❌'} | Version: ${ua.hasVersion?'✅':'❌'} | iOS: ${ua.isiOS?'✅':'❌'}`;
+
+                document.getElementById('feature-test').innerHTML =
+                    `IndexedDB: ${features.indexedDB?'✅':'❌'} | SW: ${features.serviceWorker?'✅':'❌'} | Fullscreen: ${features.fullscreen?'✅':'❌'}`;
+
+                document.getElementById('confidence-score').innerHTML =
+                    `<strong>Confidence:</strong> ${(this.confidence*100).toFixed(1)}% | Platform: ${features.platform} | Touch Points: ${features.maxTouchPoints}`;
+            }
+        }
+
+        function testWindowOpen() {
+            try {
+                const popup = window.open('', '_blank', 'width=200,height=100');
+                if (popup) {
+                    popup.document.write('<p>Popup OK</p>');
+                    setTimeout(() => popup.close(), 1000);
+                    updateManual('window.open: ✅');
+                } else updateManual('window.open: ❌ blocked');
+            } catch(e) {
+                updateManual(`window.open: ❌ ${e.message}`);
+            }
+        }
+
+        function testFullscreen() {
+            if (document.fullscreenEnabled) {
+                document.documentElement.requestFullscreen()
+                    .then(() => {
+                        updateManual('Fullscreen: ✅ activated');
+                        setTimeout(() => document.exitFullscreen(), 500);
+                    })
+                    .catch(e => updateManual(`Fullscreen: ❌ ${e.message}`));
+            } else updateManual('Fullscreen: ❌ unsupported');
+        }
+
+        function updateManual(msg) {
+            const d = document.getElementById('manual-test-results');
+            d.innerHTML += `<div>${msg}</div>`;
+        }
+
+        async function rerunDetection() {
+            document.getElementById('detection-result').textContent = 'Re-running…';
+            document.getElementById('manual-test-results').innerHTML = '';
+            await runDetection();
+        }
+
+        async function runDetection() {
+            const det = new IOSBrowserDetector();
+            const res = await det.runDetection();
+            det.updateUI();
+            console.log('Detection:', res);
+        }
+
+        document.addEventListener('DOMContentLoaded', runDetection);
+    </script>
+</body>
+</html>
