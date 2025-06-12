@@ -177,7 +177,15 @@
         this.finalEnvironment = this.determineEnvironment();
         // SFSafariViewController block
         if (this.finalEnvironment.includes('SFSafariViewController')) {
-          document.body.innerHTML = '<div style="padding:2em;font-family:sans-serif;text-align:center;color:white;background:#333">This browser view is not supported. Please open this page in Safari or another browser.</div>';
+          const warning = document.createElement('div');
+          warning.className = 'warning';
+          warning.innerHTML = `
+    <h2 style="margin-top:0;">🚫 Limited Browser View Detected</h2>
+    <p>This page is currently being viewed inside <strong>SFSafariViewController</strong>, which restricts certain browser capabilities.</p>
+    <p>For the full experience, please open this page in the native Safari app or any other modern browser.</p>
+  `;
+          document.querySelector('.container')?.prepend(warning);
+          document.getElementById('detection-result').textContent = this.finalEnvironment + ' (limited)';
           return;
         }
         this.confidence      = this.calculateConfidence();
@@ -185,15 +193,15 @@
       }
 
       determineEnvironment() {
-        const {webkit,form,fonts,ua} = this.results;
+        const {webkit, form, fonts, ua} = this.results;
         if (webkit.hasWK) return 'WKWebView (confirmed)';
+        if (ua.isSafariAppUA) return 'Safari App (confirmed via UA)';
         if (form.blocked && fonts['.Helvetica LT MM']) return 'SFSafariViewController (detected via form+font)';
         if (ua.hasChrome) return 'Chrome iOS';
         if (ua.hasFirefox) return 'Firefox iOS';
         if (ua.hasEdge) return 'Edge iOS';
         if (ua.standalone) return 'PWA (Home Screen)';
         if (ua.isSafari && ua.hasVersion) return form.blocked ? 'SFSafariViewController (possible)' : 'Safari App (likely)';
-        if (ua.isSafariAppUA) return 'Safari App (confirmed via UA)';
         return 'Generic WebView';
       }
 
