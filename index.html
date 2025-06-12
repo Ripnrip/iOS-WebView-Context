@@ -260,75 +260,92 @@
             determineEnvironment() {
               const { webkit, form, fonts, ua } = this.results;
 
+              // 1) WKWebView still wins first
               if (webkit.hasWK) {
                 return 'WKWebView (confirmed)';
               }
 
-              // Direct UA-based Safari App detection:
+              // 2) If both invisible‐form is blocked AND the font hack detects Helvetica,
+              //    we can be confident it’s SFSafariViewController—no UA overrides.
+              if (form.blocked && fonts['.Helvetica LT MM']) {
+                return 'SFSafariViewController (detected via form+font)';
+              }
+
+              // 3) Next, Safari App via UA (optional, but will never override SFVC)
               if (ua.isSafariAppUA) {
                 return 'Safari App (confirmed via UA)';
               }
 
-              // Third-party browsers
-              if (ua.hasChrome) return 'Chrome iOS';
+              // 4) Third-party browsers
+              if (ua.hasChrome)  return 'Chrome iOS';
               if (ua.hasFirefox) return 'Firefox iOS';
-              if (ua.hasEdge)   return 'Edge iOS';
+              if (ua.hasEdge)    return 'Edge iOS';
 
-              // PWA
+              // 5) PWA / Home-screen
               if (ua.standalone) return 'PWA (Home Screen)';
 
-              // Fallback to SFSafariViewController vs Safari heuristics
+              // 6) Fallback Safari vs SFVC inconclusive
               if (ua.isSafari && ua.hasVersion) {
-                const blocked = form.blocked;
-                const fontDetected = fonts['.Helvetica LT MM'];
-
-                if (blocked && fontDetected)     return 'SFSafariViewController (high confidence)';
-                if (blocked)                     return 'SFSafariViewController (medium confidence)';
-                if (!blocked && !fontDetected)   return 'Safari App (likely, via form+font)';
-                return 'Safari/SFSafariViewController (inconclusive)';
+                // We already handled the strong SFVC case above,
+                // so here it’s either Safari App or ambiguous
+                return form.blocked
+                  ? 'SFSafariViewController (possible, form blocked only)'
+                  : 'Safari App (likely)';
               }
 
-              // Generic WebView
-              if (ua.isiOS && !ua.isSafari) return 'Generic WebView';
+              // 7) Generic WebView
+              if (ua.isiOS && !ua.isSafari) {
+                return 'Generic WebView';
+              }
 
+              // 8) Last resort
               return 'Unknown iOS Browser';
             }
 
             calculateConfidence() {
-                const { webkit, form, fonts, ua } = this.results;
-                let s = 0;
-                if (webkit.hasWK) s += 0.4;
-                if (ua.hasChrome||ua.hasFirefox||ua.hasEdge) s += 0.4;
-                if (ua.standalone) s += 0.4;
-                if (form.blocked) s += 0.2;
-                if (fonts['.Helvetica LT MM']) s += 0.2;
-                if (ua.isSafari && ua.hasVersion) s += 0.1;
-                return Math.min(s,1);
+              const { webkit, form, fonts, ua } = this.results;
+              let s = 0;
+              if (webkit.hasWK)                 s += 0.4;
+              if (ua.hasChrome || ua.hasFirefox || ua.hasEdge) s += 0.4;
+              if (ua.standalone)                s += 0.4;
+              if (form.blocked)                 s += 0.2;
+              if (fonts['.Helvetica LT MM'])    s += 0.2;
+              if (ua.isSafari && ua.hasVersion) s += 0.1;
+              return Math.min(s, 1);
             }
 
             updateUI() {
-                const { webkit, form, fonts, ua, features } = this.results;
-                document.getElementById('detection-result').textContent = this.finalEnvironment;
+              const { webkit, form, fonts, ua, features } = this.results;
+              document.getElementById('detection-result').textContent = this.finalEnvironment;
 
-                document.getElementById('webkit-test').innerHTML =
-                    `<strong>WKWebView:</strong> ${webkit.hasWK ? '✅' : '❌'}`;
+              document.getElementById('webkit-test').innerHTML =
+                `<strong>WKWebView:</strong> ${webkit.hasWK ? '✅' : '❌'}`;
 
-                document.getElementById('form-test').innerHTML =
-                    `<strong>Form blocked:</strong> ${form.blocked ? '✅' : '❌'} (${form.method})`;
+              document.getElementById('form-test').innerHTML =
+                `<strong>Form blocked:</strong> ${form.blocked ? '✅' : '❌'} (${form.method})`;
 
-                document.getElementById('font-test').innerHTML =
-                    Object.entries(fonts).map(([f,d]) => `${f}: ${d?'✅':'❌'}`).join(' | ');
+              document.getElementById('font-test').innerHTML =
+                Object.entries(fonts)
+                  .map(([name, detected]) => `${name}: ${detected ? '✅' : '❌'}`)
+                  .join(' | ');
 
-                document.getElementById('ua-test').innerHTML =
-                    `Safari: ${ua.isSafari?'✅':'❌'} | Version: ${ua.hasVersion?'✅':'❌'} | iOS: ${ua.isiOS?'✅':'❌'}`;
+              document.getElementById('ua-test').innerHTML =
+                `Safari: ${ua.isSafari ? '✅' : '❌'} | Version: ${ua.hasVersion ? '✅' : '❌'} | iOS: ${ua.isiOS ? '✅' : '❌'}`;
 
-                document.getElementById('feature-test').innerHTML =
-                    `IndexedDB: ${features.indexedDB?'✅':'❌'} | SW: ${features.serviceWorker?'✅':'❌'} | Fullscreen: ${features.fullscreen?'✅':'❌'}`;
+              document.getElementById('feature-test').innerHTML =
+                `IndexedDB: ${features.indexedDB ? '✅' : '❌'} | SW: ${features.serviceWorker ? '✅' : '❌'} | Fullscreen: ${features.fullscreen ? '✅' : '❌'}`;
 
-                document.getElementById('confidence-score').innerHTML =
-                    `<strong>Confidence:</strong> ${(this.confidence*100).toFixed(1)}% | Platform: ${features.platform} | Touch Points: ${features.maxTouchPoints}`;
+              // convert numeric confidence to Strong / Medium / None
+              let level = 'None';
+              if (this.confidence >= 0.6) {
+                level = 'Strong';
+              } else if (this.confidence >= 0.3) {
+                level = 'Medium';
+              }
+
+              document.getElementById('confidence-score').innerHTML =
+                `<strong>Confidence:</strong> ${level} | Platform: ${features.platform} | Touch Points: ${features.maxTouchPoints}`;
             }
-        }
 
         function testWindowOpen() {
             try {
