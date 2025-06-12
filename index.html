@@ -186,14 +186,14 @@
 
       determineEnvironment() {
         const {webkit,form,fonts,ua} = this.results;
-        if(webkit.hasWK) return 'WKWebView (confirmed)';
-        if(form.blocked && fonts['.Helvetica LT MM']) return 'SFSafariViewController (detected via form+font)';
-        if(ua.isSafariAppUA) return 'Safari App (confirmed via UA)';
-        if(ua.hasChrome)  return 'Chrome iOS';
-        if(ua.hasFirefox) return 'Firefox iOS';
-        if(ua.hasEdge)    return 'Edge iOS';
-        if(ua.standalone) return 'PWA (Home Screen)';
-        if(ua.isSafari && ua.hasVersion) return form.blocked ? 'SFSafariViewController (possible)' : 'Safari App (likely)';
+        if (webkit.hasWK) return 'WKWebView (confirmed)';
+        if (form.blocked && fonts['.Helvetica LT MM']) return 'SFSafariViewController (detected via form+font)';
+        if (ua.hasChrome) return 'Chrome iOS';
+        if (ua.hasFirefox) return 'Firefox iOS';
+        if (ua.hasEdge) return 'Edge iOS';
+        if (ua.standalone) return 'PWA (Home Screen)';
+        if (ua.isSafari && ua.hasVersion) return form.blocked ? 'SFSafariViewController (possible)' : 'Safari App (likely)';
+        if (ua.isSafariAppUA) return 'Safari App (confirmed via UA)';
         return 'Generic WebView';
       }
 
