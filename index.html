@@ -89,8 +89,26 @@
         this.confidence = 0;
         this.finalEnvironment = 'unknown';
       }
+      
+      function isWKWebView() {
+        const hasMessageHandlers = !!(window.webkit && window.webkit.messageHandlers);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const isSafari = typeof window.safari !== 'undefined' && !!window.safari.pushNotification;
+        const isLikelyWK = isIOS && !isSafari;
 
-      isWKWebView()       { return !!(window.webkit && window.webkit.messageHandlers); }
+        // localStorage fallback check (some WKWebViews block this)
+        let localStorageWorks = true;
+        try {
+          localStorage.setItem('__wk_test', '1');
+          localStorage.removeItem('__wk_test');
+        } catch (e) {
+          localStorageWorks = false;
+        }
+
+        return (hasMessageHandlers || isLikelyWK) && localStorageWorks;
+      }
+      
+      
       hasDoNotTrack()     { return typeof navigator.doNotTrack!=='undefined' || typeof window.doNotTrack!=='undefined'; }
       hasServiceWorkers() { return 'serviceWorker' in navigator; }
 
@@ -237,6 +255,13 @@
         this.results.visibilitySignal = await this.testVisibilityChangeSignal();
         this.results.windowOpenBlocked = this.testWindowOpenSignal();
         this.finalEnvironment = this.determineEnvironment();
+        if (this.results.webkit.hasWK && !window.webkit?.messageHandlers) {
+          const msg = document.createElement('div');
+          msg.className = 'warning';
+          msg.innerHTML = `<strong>ℹ️ Detected WKWebView without injected message handler.</strong><br>
+      Native app may not support bidirectional messaging.`;
+          document.querySelector('.container')?.appendChild(msg);
+        }
         // Additional signals for SFSafariViewController
         if (this.results.visibilitySignal || this.results.windowOpenBlocked) {
           this.finalEnvironment = 'SFSafariViewController (via visibility/windowOpen signal)';
@@ -260,27 +285,45 @@
 
       determineEnvironment() {
         const {webkit, form, fonts, ua} = this.results;
-        if (webkit.hasWK) return 'WKWebView (confirmed)';
-        
-        // NEW: if either visibility-change or window.open blocking fires, treat as SFVC
+
+        if (webkit.hasWK) {
+          if (ua.isSafariAppUA) {
+            if (this.results.windowOpenBlocked || this.results.visibilitySignal)
+              return 'SFSafariViewController (false positive from UA)';
+            return 'Safari App (likely)';
+          }
+          return 'WKWebView (likely)';
+        }
+
         if (this.results.visibilitySignal || this.results.windowOpenBlocked) {
           return 'SFSafariViewController (via visibility/windowOpen signal)';
         }
-
         if (form.blocked && fonts['.Helvetica LT MM']) {
           return 'SFSafariViewController (detected via form+font)';
         }
         
         
+        let env = null;
+
         if (this.useUA) {
-          if (ua.isSafariAppUA) return 'Safari App (confirmed via UA)';
-          if (ua.hasChrome) return 'Chrome iOS';
-          if (ua.hasFirefox) return 'Firefox iOS';
-          if (ua.hasEdge) return 'Edge iOS';
-          if (ua.standalone) return 'PWA (Home Screen)';
-          if (ua.isSafari && ua.hasVersion) return form.blocked ? 'SFSafariViewController (possible)' : 'Safari App (likely)';
+          if (ua.isSafariAppUA) env = 'Safari App (confirmed via UA)';
+          else if (ua.hasChrome) env = 'Chrome iOS';
+          else if (ua.hasFirefox) env = 'Firefox iOS';
+          else if (ua.hasEdge) env = 'Edge iOS';
+          else if (ua.standalone) env = 'PWA (Home Screen)';
+          else if (ua.isSafari && ua.hasVersion)
+            env = form.blocked ? 'SFSafariViewController (possible)' : 'Safari App (likely)';
         }
-        return 'Generic WebView';
+
+        // Now weigh that against other checks before finalizing
+        if (!env && form.blocked && fonts['.Helvetica LT MM']) {
+          env = 'SFSafariViewController (detected via form+font)';
+        }
+        if (!env && this.results.visibilitySignal || this.results.windowOpenBlocked) {
+          env = 'SFSafariViewController (via visibility/windowOpen signal)';
+        }
+
+        return env || 'Generic WebView';
       }
 
       calculateConfidence() {
