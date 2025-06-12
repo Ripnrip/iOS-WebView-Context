@@ -84,6 +84,9 @@
     </style>
 </head>
 <body>
+    <!-- Hidden iframe for form-submission detection -->
+    <iframe name="detect-iframe" style="display:none;"></iframe>
+
     <div class="container">
         <h1>🔍 iOS Browser Detection</h1>
 
@@ -155,13 +158,15 @@
                     form.style.display = 'none';
                     form.method = 'POST';
                     form.action = '#';
+                    form.target = 'detect-iframe';  // ← send into hidden iframe
+
                     const input = document.createElement('input');
                     input.type = 'hidden'; input.name = 'test'; input.value = 'detection';
                     form.appendChild(input);
                     document.body.appendChild(form);
 
-                    let blocked = false, timed = false;
-                    const onSubmit = (e) => {
+                    let blocked = false;
+                    const onSubmit = e => {
                         e.preventDefault();
                         cleanup();
                         resolve({ blocked: false, method: 'submit-event' });
@@ -170,7 +175,6 @@
 
                     const timer = setTimeout(() => {
                         blocked = true;
-                        timed = true;
                         cleanup();
                         resolve({ blocked: true, method: 'timeout' });
                     }, 100);
