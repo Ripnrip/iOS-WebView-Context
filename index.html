@@ -90,7 +90,7 @@
         this.finalEnvironment = 'unknown';
       }
       
-      function isWKWebView() {
+      isWKWebView() {
         const hasMessageHandlers = !!(window.webkit && window.webkit.messageHandlers);
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
         const isSafari = typeof window.safari !== 'undefined' && !!window.safari.pushNotification;
