@@ -195,8 +195,8 @@
       determineEnvironment() {
         const {webkit, form, fonts, ua} = this.results;
         if (webkit.hasWK) return 'WKWebView (confirmed)';
-        if (ua.isSafariAppUA) return 'Safari App (confirmed via UA)';
         if (form.blocked && fonts['.Helvetica LT MM']) return 'SFSafariViewController (detected via form+font)';
+        if (ua.isSafariAppUA) return 'Safari App (confirmed via UA)';
         if (ua.hasChrome) return 'Chrome iOS';
         if (ua.hasFirefox) return 'Firefox iOS';
         if (ua.hasEdge) return 'Edge iOS';
