@@ -175,6 +175,11 @@
         this.results.ua     = this.analyzeUserAgent();
         this.results.features = this.testFeatures();
         this.finalEnvironment = this.determineEnvironment();
+        // SFSafariViewController block
+        if (this.finalEnvironment.includes('SFSafariViewController')) {
+          document.body.innerHTML = '<div style="padding:2em;font-family:sans-serif;text-align:center;color:white;background:#333">This browser view is not supported. Please open this page in Safari or another browser.</div>';
+          return;
+        }
         this.confidence      = this.calculateConfidence();
         return {environment:this.finalEnvironment,confidence:this.confidence};
       }
