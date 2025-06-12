@@ -214,12 +214,13 @@
             }
 
             analyzeUserAgent() {
-                const ua = navigator.userAgent;
-                return {
-                    full: ua,
-                    isiOS: /iPad|iPhone|iPod/.test(ua),
-                    isSafari: /Safari/.test(ua),
-                    hasVersion: /Version\//.test(ua),
+              const ua = navigator.userAgent;
+              return {
+                full: ua,
+                isiOS: /iPad|iPhone|iPod/.test(ua),
+                isSafari: /Safari/.test(ua),
+                hasVersion: /Version\/\d+(\.\d+)?/.test(ua),
+                isSafariAppUA: /Version\/\d+(\.\d+)?\s+Mobile\/\S+\s+Safari\//.test(ua) && navigator.vendor === 'Apple Computer, Inc.',
                     hasChrome: /CriOS/.test(ua),
                     hasFirefox: /FxiOS/.test(ua),
                     hasEdge: /EdgiOS/.test(ua),
@@ -257,24 +258,40 @@
             }
 
             determineEnvironment() {
-                const { webkit, form, fonts, ua, features } = this.results;
-                if (webkit.hasWK) return 'WKWebView (confirmed)';
-                if (ua.hasChrome) return 'Chrome iOS';
-                if (ua.hasFirefox) return 'Firefox iOS';
-                if (ua.hasEdge) return 'Edge iOS';
-                if (ua.standalone) return 'PWA (Home Screen)';
+              const { webkit, form, fonts, ua } = this.results;
 
-                if (ua.isSafari && ua.hasVersion) {
-                    const blocked = form.blocked;
-                    const fontDetected = fonts['.Helvetica LT MM'];
-                    if (blocked && fontDetected) return 'SFSafariViewController (high confidence)';
-                    if (blocked) return 'SFSafariViewController (medium)';
-                    if (!blocked && !fontDetected) return 'Safari App (likely)';
-                    return 'Safari/SFSafariViewController (inconclusive)';
-                }
+              if (webkit.hasWK) {
+                return 'WKWebView (confirmed)';
+              }
 
-                if (ua.isiOS && !ua.isSafari) return 'Generic WebView';
-                return 'Unknown iOS Browser';
+              // Direct UA-based Safari App detection:
+              if (ua.isSafariAppUA) {
+                return 'Safari App (confirmed via UA)';
+              }
+
+              // Third-party browsers
+              if (ua.hasChrome) return 'Chrome iOS';
+              if (ua.hasFirefox) return 'Firefox iOS';
+              if (ua.hasEdge)   return 'Edge iOS';
+
+              // PWA
+              if (ua.standalone) return 'PWA (Home Screen)';
+
+              // Fallback to SFSafariViewController vs Safari heuristics
+              if (ua.isSafari && ua.hasVersion) {
+                const blocked = form.blocked;
+                const fontDetected = fonts['.Helvetica LT MM'];
+
+                if (blocked && fontDetected)     return 'SFSafariViewController (high confidence)';
+                if (blocked)                     return 'SFSafariViewController (medium confidence)';
+                if (!blocked && !fontDetected)   return 'Safari App (likely, via form+font)';
+                return 'Safari/SFSafariViewController (inconclusive)';
+              }
+
+              // Generic WebView
+              if (ua.isiOS && !ua.isSafari) return 'Generic WebView';
+
+              return 'Unknown iOS Browser';
             }
 
             calculateConfidence() {
