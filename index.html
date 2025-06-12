@@ -255,7 +255,11 @@
         this.results.visibilitySignal = await this.testVisibilityChangeSignal();
         this.results.windowOpenBlocked = this.testWindowOpenSignal();
         this.finalEnvironment = this.determineEnvironment();
-        if (this.results.webkit.hasWK && !window.webkit?.messageHandlers) {
+        if (
+          this.results.webkit.hasWK &&
+          !window.webkit?.messageHandlers &&
+          this.finalEnvironment.includes('WKWebView')
+        ) {
           const msg = document.createElement('div');
           msg.className = 'warning';
           msg.innerHTML = `<strong>ℹ️ Detected WKWebView without injected message handler.</strong><br>
@@ -263,7 +267,10 @@
           document.querySelector('.container')?.appendChild(msg);
         }
         // Additional signals for SFSafariViewController
-        if (this.results.visibilitySignal || this.results.windowOpenBlocked) {
+        if (
+          !this.results.webkit.hasWK && // not already detected as WKWebView
+          (this.results.visibilitySignal || this.results.windowOpenBlocked)
+        ) {
           this.finalEnvironment = 'SFSafariViewController (via visibility/windowOpen signal)';
         }
         // SFSafariViewController block
